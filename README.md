@@ -1,7 +1,5 @@
 # NoSQL Exploration
 
-## Project 2024-2025
-
 This project involves developing a Python application to interact with two NoSQL cloud databases: **MongoDB** (document-oriented) and **Neo4j** (graph-oriented).
 
 ### Objectives:
@@ -22,3 +20,12 @@ This project involves developing a Python application to interact with two NoSQL
 - Search for tweets containing specific hashtags or replies to other tweets.
 - Identify active users (followers, followees).
 - Analyze conversations and find long or popular discussions (tweets, hashtags).
+
+### To use :
+
+Change the "UPDATE_connection.py" file with your own credentials and rename it to "connection.py"
+Then you can run python3 on src.
+
+```
+python3 .\src
+```
