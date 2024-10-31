@@ -37,37 +37,121 @@ def donner_tweets_reponses():
     str=''
     for tweet in c:
         str+=f"Tweet: {tweet['idTweet']} - Réponse à: {int(tweet['replyIdTweet'])}\n"
-    messagebox.showinfo("Nombre de tweets qui sont des réponses", f"Nombre de tweets qui sont des réponses: {str}")
+    messagebox.showinfo("Différents tweets qui sont des réponses", f"Nombre de tweets qui sont des réponses: {str}")
 #7
-def donner_followers_IUT():
-    messagebox.showinfo("Followers de IUT", "Fonction 7: Liste des followers de IUT ici.")
+def donner_followers_BenAbdelazizC():
+    global neo4j_driver
+    global mongoDB_driver
+    id=mongoDB_driver.db.user.find_one({"screenName":"BenAbdelazizC"})['idUser']
+    with neo4j_driver.session() as session:
+        query = f"""
+        MATCH (u:User )-[:FOLLOW]->(f:User{{idUser: {id}}})
+        RETURN u
+        """
+        c=session.run(query)
 
+    str=''
+    for record in c:
+        r=mongoDB_driver.db.user.find_one({"idUser":record['u']['idUser']})
+        str+=f"{r['screenName']}\n"
+
+    messagebox.showinfo(f"Followers de BenAbdelazizC: {str}")
+#8
 def donner_utilisateurs_suivis_UCA():
-    messagebox.showinfo("Utilisateurs suivis par UCA", "Fonction 8: Liste des utilisateurs suivis par UCA ici.")
-
+    global neo4j_driver
+    query = """
+    MATCH (u:User {screenName: 'UCA'})-[:FOLLOW]->(followedUser)
+    RETURN followedUser.screenName AS FollowedUser
+    """
+    with neo4j_driver.session() as session:
+        result = session.run(query)
+        followed_users = [record['FollowedUser'] for record in result]
+    messagebox.showinfo("Utilisateurs suivis par UCA", "\n".join(followed_users) if followed_users else "Il y a aucun utilisateur suivi par UCA.")
+#9
 def donner_followers_et_followees_UCA():
-    messagebox.showinfo("Followers et followees de UCA", "Fonction 9: Liste des utilisateurs qui sont à la fois followers et followees de UCA ici.")
-
+    global neo4j_driver
+    query = """
+    MATCH (u:User {screenName: 'UCA'})<-[:FOLLOW]->(mutualUser)
+    RETURN mutualUser.screenName AS MutualUser
+    """
+    with neo4j_driver.session() as session:
+        result = session.run(query)
+        mutual_users = [record['MutualUser'] for record in result]
+    messagebox.showinfo("Followers et followees de UCA", "\n".join(mutual_users) if mutual_users else "Il y a aucun followers et followees mutuelle de UCA.")
+#10
 def donner_utilisateurs_plus_10_followers():
-    messagebox.showinfo("Utilisateurs avec plus de 10 followers", "Fonction 10: Liste des utilisateurs avec plus de 10 followers ici.")
-
+    global neo4j_driver
+    query = """
+    MATCH (u:User)<-[:FOLLOW]-(follower)
+    WITH u, COUNT(follower) AS followerCount
+    WHERE followerCount > 10
+    RETURN u.screenName AS User, followerCount
+    """
+    with neo4j_driver.session() as session:
+        result = session.run(query)
+        users = [f"{record['User']} ({record['followerCount']} followers)" for record in result]
+    messagebox.showinfo("Utilisateurs avec plus de 10 followers", "\n".join(users) if users else "Aucun utilisateur a plus que 10 followers.")
+#11
 def donner_utilisateurs_plus_5_suivis():
-    messagebox.showinfo("Utilisateurs qui suivent plus de 5 utilisateurs", "Fonction 11: Liste des utilisateurs qui suivent plus de 5 utilisateurs ici.")
-
+    global neo4j_driver
+    query = """
+    MATCH (u:User)-[:FOLLOW]->(followed)
+    WITH u, COUNT(followed) AS followedCount
+    WHERE followedCount > 5
+    RETURN u.screenName AS User, followedCount
+    """
+    with neo4j_driver.session() as session:
+        result = session.run(query)
+        users = [f"{record['User']} (follows {record['followedCount']} users)" for record in result]
+    messagebox.showinfo("Utilisateurs qui suivent plus de 5 utilisateurs", "\n".join(users) if users else "Il y a aucun user qui suit plus de 5 utilisateurs.")
+#12
 def donner_tweets_plus_populaires():
-    messagebox.showinfo("10 tweets les plus populaires", "Fonction 12: Liste des 10 tweets les plus populaires ici.")
-
+    global mongoDB_driver
+    tweets = list(mongoDB_driver.db.tweet.find().sort("nbRetweet", -1).limit(10))
+    tweet_texts = [f"{tweet['text']} (Retweets: {tweet['nbRetweet']})" for tweet in tweets]
+    messagebox.showinfo("10 tweets les plus populaires", "\n".join(tweet_texts) if tweet_texts else "Aucun tweet populaire trouvé.")
+#13
 def donner_hashtags_plus_populaires():
-    messagebox.showinfo("10 hashtags les plus populaires", "Fonction 13: Liste des 10 hashtags les plus populaires ici.")
-
+    global mongoDB_driver
+    hashtags = list(mongoDB_driver.db.tweet_hashtag.aggregate([
+        {"$group": {"_id": "$hashtag", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10}
+    ]))
+    popular_hashtags = [f"#{hashtag['_id']} ({hashtag['count']} uses)" for hashtag in hashtags]
+    messagebox.showinfo("10 hashtags les plus populaires", "\n".join(popular_hashtags) if popular_hashtags else "Aucun hashtag populaire trouvé.")
+#14
 def donner_tweets_discussion():
-    messagebox.showinfo("Tweets qui initient une discussion", "Fonction 14: Liste des tweets qui initient une discussion ici.")
-
+    global mongoDB_driver
+    tweets = list(mongoDB_driver.db.tweet.find({"replyIdTweet": {"$ne": None}}))
+    discussion_tweets = [tweet['text'] for tweet in tweets]
+    messagebox.showinfo("Tweets qui initient une discussion", "\n".join(discussion_tweets) if discussion_tweets else "Aucune tweet qui initie une discussion a été trouvé.")
+#15
 def plus_longue_discussion():
-    messagebox.showinfo("Plus longue discussion", "Fonction 15: Détails de la plus longue discussion ici.")
-
+    global mongoDB_driver
+    pipeline = [
+        {"$match": {"replyIdTweet": {"$ne": None}}},
+        {"$group": {"_id": "$replyIdTweet", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 1}
+    ]
+    longest_discussion = list(mongoDB_driver.db.tweet.aggregate(pipeline))
+    if longest_discussion:
+        root_tweet_id = longest_discussion[0]['_id']
+        count = longest_discussion[0]['count']
+        messagebox.showinfo("Plus longue discussion", f"Tweet ID: {root_tweet_id} avec {count} réponse.")
+    else:
+        messagebox.showinfo("Plus longue discussion", "Aucune discussions trouvé.")
+#16
 def debut_fin_conversations():
-    messagebox.showinfo("Début et fin des conversations", "Fonction 16: Détails sur le début et la fin de chaque conversation ici.")
+    global mongoDB_driver
+    pipeline = [
+        {"$match": {"replyIdTweet": {"$ne": None}}},
+        {"$group": {"_id": "$replyIdTweet", "firstReply": {"$min": "$createdAt"}, "lastReply": {"$max": "$createdAt"}}}
+    ]
+    conversations = list(mongoDB_driver.db.tweet.aggregate(pipeline))
+    conversation_details = [f"Root Tweet ID: {c['_id']}, Start: {c['firstReply']}, End: {c['lastReply']}" for c in conversations]
+    messagebox.showinfo("Début et fin des conversations", "\n".join(conversation_details) if conversation_details else "Aucune conversations trouvé.")
 
 
 def launch_app(driverMongo,driverNeo4j):
@@ -90,7 +174,7 @@ def launch_app(driverMongo,driverNeo4j):
         "4. Donner le nombre de tweets contenant le hashtag actualité",
         "5. Donner le nombre d'utilisateurs différents qui ont tweeté un tweet contenant le hashtag IUT",
         "6. Donner les tweets qui sont des réponses à un autre tweet",
-        "7. Donner le nom des followers de IUT",
+        "7. Donner le nom des followers de BenAbdelazizC",
         "8. Donner le nom des utilisateurs suivis par UCA",
         "9. Donner le nom des utilisateurs qui sont à la fois followers et followees de UCA",
         "10. Donner les utilisateurs ayant plus de 10 followers",
@@ -110,7 +194,7 @@ def launch_app(driverMongo,driverNeo4j):
         donner_nombre_tweets_actualite,
         donner_utilisateurs_différents_hashtag_IUT,
         donner_tweets_reponses,
-        donner_followers_IUT,
+        donner_followers_BenAbdelazizC,
         donner_utilisateurs_suivis_UCA,
         donner_followers_et_followees_UCA,
         donner_utilisateurs_plus_10_followers,
